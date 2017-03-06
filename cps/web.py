@@ -1288,6 +1288,31 @@ def get_download_link(book_id, format):
     else:
         abort(404)
 
+@app.route("/download/kobo/<int:book_id>/<filename>.<format>")
+@login_required_if_no_ano
+@download_required
+def get_download_link_kobo(book_id,filename, format):
+    book = db.session.query(db.Books).filter(db.Books.id == book_id).first()
+    data = db.session.query(db.Data).filter(db.Data.book == book.id).filter(db.Data.format == format.upper()).first()
+    if data:
+        # collect downloaded books only for registered user and not for anonymous user
+        if current_user.is_authenticated:
+            helper.update_download(book_id, int(current_user.id))
+        file_name = book.title
+        if len(book.authors) > 0:
+            file_name = book.authors[0].name + '-' + file_name
+        file_name = helper.get_valid_filename(file_name)
+        response = make_response(
+            send_from_directory(os.path.join(config.config_calibre_dir, book.path), data.name + "." + format))
+        try:
+            response.headers["Content-Type"] = mimetypes.types_map['.' + format]
+        except:
+            pass
+        response.headers["Content-Disposition"] = "attachment; filename*=UTF-8''%s.%s" % (urllib.quote(file_name.encode('utf-8')), format)
+        return response
+    else:
+        abort(404)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
